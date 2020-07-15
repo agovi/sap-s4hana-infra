@@ -33,14 +33,14 @@ resource "azurerm_subnet" "sap-db-subnet" {
 
 
 resource "azurerm_subnet" "bastion-subnet" {
-    name = "bastion-subnet"
+    name = "AzureBastionSubnet"
     resource_group_name = azurerm_resource_group.sap-rg.name
     virtual_network_name = azurerm_virtual_network.sap-vnet.name
     address_prefixes = [var.bastionsubnet]
 }
 
 resource "azurerm_network_security_group" "sap-db-nsg" {
-  name                = "sap-db-nsg"
+  name                = "SAPDatabaseNsg"
   location            = var.location
   resource_group_name = azurerm_resource_group.sap-rg.name
 
@@ -51,7 +51,7 @@ resource "azurerm_network_security_group" "sap-db-nsg" {
     access                     = "Allow"
     protocol                   = "Tcp"
     source_port_range          = "*"
-    destination_port_range     = "30015,30013,50013"
+    destination_port_ranges     = ["30015","30013","50013"]
     source_address_prefix    = var.sapappsubnet
     destination_address_prefix = "*"
   }
@@ -70,21 +70,10 @@ resource "azurerm_network_security_group" "sap-db-nsg" {
 
 
 resource "azurerm_network_security_group" "sap-app-nsg" {
-  name                = "sap-app-nsg"
+  name                = "SAPApplicationNsg"
   location            = var.location
   resource_group_name = azurerm_resource_group.sap-rg.name
 
-  security_rule {
-    name                       = "SAP Ports"
-    priority                   = 100
-    direction                  = "Inbound"
-    access                     = "Allow"
-    protocol                   = "Tcp"
-    source_port_range          = "*"
-    destination_port_range     = "3900,8001,8000,3600,3300,3200"
-    source_address_prefix    = var.sapappsubnet
-    destination_address_prefix = "*"
-  }
   security_rule {
     name                       = "RDPfromBastion"
     priority                   = 110
@@ -100,7 +89,7 @@ resource "azurerm_network_security_group" "sap-app-nsg" {
 
 
 resource "azurerm_network_security_group" "bastion-nsg" {
-  name                = "bastion-nsg"
+  name                = "BastionNsg"
   location            = var.location
   resource_group_name = azurerm_resource_group.sap-rg.name
 
@@ -135,7 +124,7 @@ resource "azurerm_network_security_group" "bastion-nsg" {
     access                     = "Allow"
     protocol                   = "Tcp"
     source_port_range          = "*"
-    destination_port_range     = "22,3389"
+    destination_port_ranges     = ["22","3389"]
     source_address_prefix      = "*"
     destination_address_prefix = "VirtualNetwork"
   }
@@ -288,7 +277,7 @@ resource "azurerm_public_ip" "bastion-pip" {
     location = var.location
     resource_group_name = azurerm_resource_group.sap-rg.name
     sku = "Standard"
-    allocation_method = "Dynamic"
+    allocation_method = "Static"
 }
 
 resource "azurerm_bastion_host" "sap-bastion" {
