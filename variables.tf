@@ -24,7 +24,7 @@ variable "tags" {
 }
 
 variable "vnetprefix" {
-  type = list
+  type        = list
   description = "Address prefix for the VNET"
 
 }
@@ -42,41 +42,41 @@ variable "bastionsubnet" {
 
 variable "appvmname" {
   description = "Name of the VM to be created"
- }
+}
 
 variable "appvmsize" {
   description = "Size of the VM to be created"
- }
+}
 
 variable "dbvmname" {
   description = "Name of the VM to be created"
- }
+}
 
 variable "dbvmsize" {
   description = "Size of the VM to be created"
- }
+}
 
- variable "luns" {
-     type = list
-     description = "Number of luns required"
-     default = [0,1,2,3,4,5,6,7,8,9]
- }
+variable "luns" {
+  type        = list
+  description = "Number of luns required"
+  default     = [0, 1, 2, 3, 4, 5, 6, 7, 8]
+}
 
 variable "cache_settings" {
-    type = list
-    description = "Cache settings for luns"
-    default = ["ReadWrite","ReadWrite","ReadOnly","None","None","None","None","None","None","None"]
+  type        = list
+  description = "Cache settings for luns"
+  default     = ["None", "None", "None", "None", "None", "None", "None", "ReadOnly", "ReadWrite"]
 }
 
 variable "disksizes" {
-    type = list
-    description = "Disk sizes"
-    default = [64,64,512,128,128,128,128,128,128,128]
+  type        = list
+  description = "Disk sizes"
+  default     = [128, 128, 128, 128, 128, 128, 128, 512, 128]
 }
 
 variable "waflag" {
-    type = list
-    description = "Disk sizes"
-    default = ["false","false","false","false","false","false","false","false","false","false"]
+  type        = list
+  description = "Disk sizes"
+  default     = ["false", "false", "false", "false", "false", "false", "false", "false", "false", "false"]
 }
 
