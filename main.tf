@@ -31,6 +31,12 @@ resource "azurerm_subnet" "sap-db-subnet" {
   address_prefixes     = [var.sapdbsubnet]
 }
 
+resource "azurerm_subnet" "sap-hub-subnet" {
+  name                 = "sap-hub-subnet"
+  resource_group_name  = azurerm_resource_group.sap-rg.name
+  virtual_network_name = azurerm_virtual_network.sap-vnet.name
+  address_prefixes     = [var.hubsubnet]
+}
 
 resource "azurerm_subnet" "bastion-subnet" {
   name                 = "AzureBastionSubnet"
@@ -45,7 +51,7 @@ resource "azurerm_network_security_group" "sap-db-nsg" {
   resource_group_name = azurerm_resource_group.sap-rg.name
 
   security_rule {
-    name                       = "HANAPortsfromApp"
+    name                       = "HANAPortsInbound"
     priority                   = 100
     direction                  = "Inbound"
     access                     = "Allow"
@@ -86,16 +92,41 @@ resource "azurerm_network_security_group" "sap-app-nsg" {
   resource_group_name = azurerm_resource_group.sap-rg.name
 
   security_rule {
-    name                       = "RDPfromBastion"
+    name                       = "SAPApplicationPortsInbound"
+    priority                   = 100
+    direction                  = "Inbound"
+    access                     = "Allow"
+    protocol                   = "Tcp"
+    source_port_range          = "*"
+    destination_port_ranges    = ["3200", "3300", "3600", "3900", "8000", "8001"]
+    source_address_prefix      = var.hubsubnet
+    destination_address_prefix = "*"
+  }
+
+  security_rule {
+    name                       = "SSHfromBastion"
     priority                   = 110
     direction                  = "Inbound"
     access                     = "Allow"
     protocol                   = "Tcp"
     source_port_range          = "*"
-    destination_port_range     = "3389"
+    destination_port_range     = "22"
     source_address_prefix      = var.bastionsubnet
     destination_address_prefix = "*"
   }
+
+  security_rule {
+    name                       = "SSHfromHub"
+    priority                   = 120
+    direction                  = "Inbound"
+    access                     = "Allow"
+    protocol                   = "Tcp"
+    source_port_range          = "*"
+    destination_port_range     = "22"
+    source_address_prefix      = var.hubsubnet
+    destination_address_prefix = "*"
+  }
+
   security_rule {
     name                       = "InboundDeny"
     priority                   = 900
@@ -140,7 +171,7 @@ resource "azurerm_network_security_group" "bastion-nsg" {
     destination_address_prefix = "*"
   }
 
-    security_rule {
+  security_rule {
     name                       = "BastionInboundDeny"
     priority                   = 900
     direction                  = "Inbound"
@@ -177,6 +208,49 @@ resource "azurerm_network_security_group" "bastion-nsg" {
   }
 }
 
+
+resource "azurerm_network_security_group" "hub-nsg" {
+  name                = "HubNsg"
+  location            = var.location
+  resource_group_name = azurerm_resource_group.sap-rg.name
+
+  security_rule {
+    name                       = "AllowSAPSupportInbound"
+    priority                   = 110
+    direction                  = "Inbound"
+    access                     = "Deny"
+    protocol                   = "Tcp"
+    source_port_range          = "*"
+    destination_port_range     = "3299"
+    source_address_prefix      = "Internet"
+    destination_address_prefix = "*"
+  }
+
+  security_rule {
+    name                       = "RDPfromBastion"
+    priority                   = 100
+    direction                  = "Inbound"
+    access                     = "Allow"
+    protocol                   = "Tcp"
+    source_port_range          = "*"
+    destination_port_range     = "3389"
+    source_address_prefix      = var.bastionsubnet
+    destination_address_prefix = "*"
+  }
+
+  security_rule {
+    name                       = "BastionInboundDeny"
+    priority                   = 900
+    direction                  = "Inbound"
+    access                     = "Deny"
+    protocol                   = "*"
+    source_port_range          = "*"
+    destination_port_range     = "*"
+    source_address_prefix      = "*"
+    destination_address_prefix = "*"
+  }
+}
+
 resource "azurerm_subnet_network_security_group_association" "sap-app-nsg-assc" {
   subnet_id                 = azurerm_subnet.sap-app-subnet.id
   network_security_group_id = azurerm_network_security_group.sap-app-nsg.id
@@ -188,10 +262,20 @@ resource "azurerm_subnet_network_security_group_association" "sap-db-nsg-assc" {
   network_security_group_id = azurerm_network_security_group.sap-db-nsg.id
 }
 
+resource "azurerm_subnet_network_security_group_association" "hub-nsg-assc" {
+  subnet_id                 = azurerm_subnet.sap-hub-subnet.id
+  network_security_group_id = azurerm_network_security_group.hub-nsg.id
+}
 
 resource "azurerm_subnet_network_security_group_association" "bastion-nsg-assc" {
   subnet_id                 = azurerm_subnet.bastion-subnet.id
   network_security_group_id = azurerm_network_security_group.bastion-nsg.id
+}
+
+resource "azurerm_proximity_placement_group" "sap-ppg" {
+  name                = "S4HANA-PPG"
+  location            = var.location
+  resource_group_name = azurerm_resource_group.sap-rg.name
 }
 
 
@@ -216,6 +300,7 @@ resource "azurerm_linux_virtual_machine" "sapdb-vm" {
   admin_username                  = "azureuser"
   network_interface_ids           = [azurerm_network_interface.sapdb-nic.id]
   admin_password                  = var.adminpassword
+  proximity_placement_group_id    = azurerm_proximity_placement_group.sap-ppg.id
   disable_password_authentication = "false"
 
   os_disk {
@@ -256,7 +341,7 @@ resource "azurerm_virtual_machine_data_disk_attachment" "db-disk-attach" {
 }
 
 resource "azurerm_virtual_machine_extension" "db-fscreate" {
-  depends_on = [azurerm_virtual_machine_data_disk_attachment.db-disk-attach]
+  depends_on           = [azurerm_virtual_machine_data_disk_attachment.db-disk-attach]
   name                 = var.dbvmname
   virtual_machine_id   = azurerm_linux_virtual_machine.sapdb-vm.id
   publisher            = "Microsoft.Azure.Extensions"
@@ -270,11 +355,20 @@ resource "azurerm_virtual_machine_extension" "db-fscreate" {
 
 }
 
+resource "azurerm_public_ip" "sap-router-pip" {
+  name                =  "SAP-Router-PublicIP"
+  resource_group_name = azurerm_resource_group.sap-rg.name
+  location            = var.location
+  allocation_method   = "Dynamic"
+}
+
+
 resource "azurerm_network_interface" "sapapp-nic" {
   depends_on          = [azurerm_subnet_network_security_group_association.sap-app-nsg-assc]
   name                = join("-", [var.appvmname, "nic"])
   location            = var.location
   resource_group_name = azurerm_resource_group.sap-rg.name
+
   ip_configuration {
     name                          = join("-", [var.appvmname, "ipconfig01"])
     subnet_id                     = azurerm_subnet.sap-app-subnet.id
@@ -283,14 +377,76 @@ resource "azurerm_network_interface" "sapapp-nic" {
   enable_accelerated_networking = "true"
 }
 
-resource "azurerm_windows_virtual_machine" "sapapp-vm" {
-  name                  = var.appvmname
+resource "azurerm_linux_virtual_machine" "sapapp-vm" {
+  ## Use DB VM as anchor for the PPG
+  depends_on                      = [azurerm_linux_virtual_machine.sapdb-vm]
+  name                            = var.appvmname
+  location                        = var.location
+  resource_group_name             = azurerm_resource_group.sap-rg.name
+  size                            = var.appvmsize
+  admin_username                  = "azureuser"
+  network_interface_ids           = [azurerm_network_interface.sapapp-nic.id]
+  admin_password                  = var.adminpassword
+  proximity_placement_group_id    = azurerm_proximity_placement_group.sap-ppg.id
+  disable_password_authentication = "false"
+
+  os_disk {
+    name                 = join("-", [var.appvmname, "osdisk"])
+    caching              = "ReadWrite"
+    storage_account_type = "Premium_LRS"
+  }
+
+  source_image_reference {
+    publisher = "SUSE"
+    offer     = "SLES-SAP"
+    sku       = "12-SP4"
+    version   = "latest"
+  }
+
+}
+
+resource "azurerm_managed_disk" "app-disks" {
+  name                 = join("-", [var.appvmname, "datadisk", "0"])
+  location             = var.location
+  resource_group_name  = azurerm_resource_group.sap-rg.name
+  storage_account_type = "Premium_LRS"
+  create_option        = "Empty"
+  disk_size_gb         = 128
+
+}
+
+resource "azurerm_virtual_machine_data_disk_attachment" "app-disk-attach" {
+  managed_disk_id    = azurerm_managed_disk.app-disks.id
+  virtual_machine_id = azurerm_linux_virtual_machine.sapapp-vm.id
+  lun                = "0"
+  caching            = "ReadWrite"
+}
+
+resource "azurerm_network_interface" "saprouter-nic" {
+  depends_on          = [azurerm_subnet_network_security_group_association.hub-nsg-assc]
+  name                = join("-", [var.routervmname, "nic"])
+  location            = var.location
+  resource_group_name = azurerm_resource_group.sap-rg.name
+
+  ip_configuration {
+    name                          = join("-", [var.routervmname, "ipconfig01"])
+    subnet_id                     = azurerm_subnet.sap-hub-subnet.id
+    private_ip_address_allocation = "Dynamic"
+    public_ip_address_id          = azurerm_public_ip.sap-router-pip.id
+  }
+  enable_accelerated_networking = "false"
+}
+
+
+
+resource "azurerm_windows_virtual_machine" "saprouter-vm" {
+  name                  = var.routervmname
   resource_group_name   = azurerm_resource_group.sap-rg.name
   location              = var.location
-  size                  = var.appvmsize
+  size                  = var.routervmsize
   admin_username        = var.adminuser
   admin_password        = var.adminpassword
-  network_interface_ids = [azurerm_network_interface.sapapp-nic.id]
+  network_interface_ids = [azurerm_network_interface.saprouter-nic.id]
 
   os_disk {
     caching              = "ReadWrite"
@@ -305,22 +461,20 @@ resource "azurerm_windows_virtual_machine" "sapapp-vm" {
   }
 }
 
-resource "azurerm_managed_disk" "app-disks" {
-  count                = 2
-  name                 = join("-", [var.appvmname, "datadisk", count.index])
+resource "azurerm_managed_disk" "router-disks" {
+  name                 = join("-", [var.routervmname, "datadisk", "0"])
   location             = var.location
   resource_group_name  = azurerm_resource_group.sap-rg.name
   storage_account_type = "Premium_LRS"
   create_option        = "Empty"
-  disk_size_gb         = 128
+  disk_size_gb         = 64
 
 }
 
-resource "azurerm_virtual_machine_data_disk_attachment" "app-disk-attach" {
-  count              = 2
-  managed_disk_id    = azurerm_managed_disk.app-disks[count.index].id
-  virtual_machine_id = azurerm_windows_virtual_machine.sapapp-vm.id
-  lun                = count.index
+resource "azurerm_virtual_machine_data_disk_attachment" "router-disk-attach" {
+  managed_disk_id    = azurerm_managed_disk.router-disks.id
+  virtual_machine_id = azurerm_windows_virtual_machine.saprouter-vm.id
+  lun                = "0"
   caching            = "ReadWrite"
 
 }
@@ -344,3 +498,41 @@ resource "azurerm_bastion_host" "sap-bastion" {
     public_ip_address_id = azurerm_public_ip.bastion-pip.id
   }
 }
+
+resource "azurerm_public_ip" "sap-loadbalancer-pip" {
+  name                =  "SAP-Loadbalancer-PublicIP"
+  resource_group_name = azurerm_resource_group.sap-rg.name
+  location            = var.location
+  allocation_method   = "Dynamic"
+}
+
+
+resource "azurerm_lb" "sap-access-lb" {
+  name  = "SAPAccessLoadBalancer"
+  location = var.location
+  resource_group_name = azurerm_resource_group.sap-rg.name
+  frontend_ip_configuration {
+     name = "SAPAccessPublicIP"
+     public_ip_address_id = azurerm_public_ip.sap-loadbalancer-pip.id
+  }
+}
+
+resource "azurerm_lb_nat_rule" "sap-access-nat" {
+  count = length(var.natports)
+  resource_group_name            = azurerm_resource_group.sap-rg.name
+  loadbalancer_id                = azurerm_lb.sap-access-lb.id
+  name                           = join("-", ["Natrule-",var.natports[count.index]])
+  protocol                       = "Tcp"
+  frontend_port                  = var.natports[count.index]
+  backend_port                   = var.natports[count.index]
+  frontend_ip_configuration_name = "SAPAccessPublicIP"
+  idle_timeout_in_minutes =  30
+}
+
+resource "azurerm_network_interface_nat_rule_association" "sap-backend-pool" {
+  count = length(var.natports)
+  network_interface_id  = azurerm_network_interface.sapapp-nic.id
+  ip_configuration_name =  join("-", [var.appvmname, "ipconfig01"])
+  nat_rule_id           = azurerm_lb_nat_rule.sap-access-nat[count.index].id
+}
+

@@ -36,6 +36,11 @@ variable "sapdbsubnet" {
   description = "Address prefix for SAP DB subnet"
 }
 
+variable "hubsubnet" {
+  description = "Address prefix for hub subnet"
+}
+
+
 variable "bastionsubnet" {
   description = "Address prefix for AzureBastion subnet"
 }
@@ -48,6 +53,15 @@ variable "appvmsize" {
   description = "Size of the VM to be created"
 }
 
+variable "routervmname" {
+  description = "Name of the VM to be created"
+}
+
+variable "routervmsize" {
+  description = "Size of the VM to be created"
+}
+
+
 variable "dbvmname" {
   description = "Name of the VM to be created"
 }
@@ -58,25 +72,26 @@ variable "dbvmsize" {
 
 variable "luns" {
   type        = list
-  description = "Number of luns required"
-  default     = [0, 1, 2, 3, 4, 5, 6, 7, 8]
+  description = "Number of luns required for DB VM"
 }
 
 variable "cache_settings" {
   type        = list
-  description = "Cache settings for luns"
-  default     = ["None", "None", "None", "None", "None", "None", "None", "ReadOnly", "ReadWrite"]
+  description = "Cache settings for luns of DB VM"
 }
 
 variable "disksizes" {
   type        = list
-  description = "Disk sizes"
-  default     = [128, 128, 128, 128, 128, 128, 128, 512, 128]
+  description = "Disk sizes for DB VM"
 }
 
 variable "waflag" {
   type        = list
-  description = "Disk sizes"
-  default     = ["false", "false", "false", "false", "false", "false", "false", "false", "false", "false"]
+  description = "Disk sizes for DB VM"
+}
+
+variable "natports"{
+  type = list
+  description = "Load balancer NAT Ports"
 }
 
