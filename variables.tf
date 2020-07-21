@@ -70,28 +70,28 @@ variable "dbvmsize" {
   description = "Size of the VM to be created"
 }
 
-variable "luns" {
+variable "dbdiskluns" {
   type        = list
   description = "Number of luns required for DB VM"
 }
 
-variable "cache_settings" {
+variable "dbdiskcache" {
   type        = list
   description = "Cache settings for luns of DB VM"
 }
 
-variable "disksizes" {
+variable "dbdisksizes" {
   type        = list
   description = "Disk sizes for DB VM"
 }
 
-variable "waflag" {
+variable "dbdiskwaflag" {
   type        = list
   description = "Disk sizes for DB VM"
 }
 
-variable "natports"{
-  type = list
+variable "natports" {
+  type        = list
   description = "Load balancer NAT Ports"
 }
 

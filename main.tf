@@ -320,23 +320,23 @@ resource "azurerm_linux_virtual_machine" "sapdb-vm" {
 }
 
 resource "azurerm_managed_disk" "db-disks" {
-  count                = length(var.luns)
+  count                = length(var.dbdiskluns)
   name                 = join("-", [var.dbvmname, "datadisk", count.index])
   location             = var.location
   resource_group_name  = azurerm_resource_group.sap-rg.name
   storage_account_type = "Premium_LRS"
   create_option        = "Empty"
-  disk_size_gb         = var.disksizes[count.index]
+  disk_size_gb         = var.dbdisksizes[count.index]
 
 }
 
 resource "azurerm_virtual_machine_data_disk_attachment" "db-disk-attach" {
-  count                     = length(var.luns)
+  count                     = length(var.dbdiskluns)
   managed_disk_id           = azurerm_managed_disk.db-disks[count.index].id
   virtual_machine_id        = azurerm_linux_virtual_machine.sapdb-vm.id
-  lun                       = var.luns[count.index]
-  caching                   = var.cache_settings[count.index]
-  write_accelerator_enabled = var.waflag[count.index]
+  lun                       = var.dbdiskluns[count.index]
+  caching                   = var.dbdiskcache[count.index]
+  write_accelerator_enabled = var.dbdiskwaflag[count.index]
 
 }
 
@@ -352,11 +352,10 @@ resource "azurerm_virtual_machine_extension" "db-fscreate" {
       "script" : "${base64encode(file("fscreate.sh"))}"
     }
   SETTINGS
-
 }
 
 resource "azurerm_public_ip" "sap-router-pip" {
-  name                =  "SAP-Router-PublicIP"
+  name                = "SAP-Router-PublicIP"
   resource_group_name = azurerm_resource_group.sap-rg.name
   location            = var.location
   allocation_method   = "Dynamic"
@@ -489,7 +488,7 @@ resource "azurerm_public_ip" "bastion-pip" {
 
 resource "azurerm_bastion_host" "sap-bastion" {
   depends_on          = [azurerm_subnet_network_security_group_association.bastion-nsg-assc]
-  name                = "S4HANA-POC-Bastion"
+  name                = "SAP-POC-Bastion"
   location            = var.location
   resource_group_name = azurerm_resource_group.sap-rg.name
   ip_configuration {
@@ -500,7 +499,7 @@ resource "azurerm_bastion_host" "sap-bastion" {
 }
 
 resource "azurerm_public_ip" "sap-loadbalancer-pip" {
-  name                =  "SAP-Loadbalancer-PublicIP"
+  name                = "SAP-Loadbalancer-PublicIP"
   resource_group_name = azurerm_resource_group.sap-rg.name
   location            = var.location
   allocation_method   = "Dynamic"
@@ -508,31 +507,31 @@ resource "azurerm_public_ip" "sap-loadbalancer-pip" {
 
 
 resource "azurerm_lb" "sap-access-lb" {
-  name  = "SAPAccessLoadBalancer"
-  location = var.location
+  name                = "SAPAccessLoadBalancer"
+  location            = var.location
   resource_group_name = azurerm_resource_group.sap-rg.name
   frontend_ip_configuration {
-     name = "SAPAccessPublicIP"
-     public_ip_address_id = azurerm_public_ip.sap-loadbalancer-pip.id
+    name                 = "SAPAccessPublicIP"
+    public_ip_address_id = azurerm_public_ip.sap-loadbalancer-pip.id
   }
 }
 
 resource "azurerm_lb_nat_rule" "sap-access-nat" {
-  count = length(var.natports)
+  count                          = length(var.natports)
   resource_group_name            = azurerm_resource_group.sap-rg.name
   loadbalancer_id                = azurerm_lb.sap-access-lb.id
-  name                           = join("-", ["Natrule-",var.natports[count.index]])
+  name                           = join("-", ["Natrule-", var.natports[count.index]])
   protocol                       = "Tcp"
   frontend_port                  = var.natports[count.index]
   backend_port                   = var.natports[count.index]
   frontend_ip_configuration_name = "SAPAccessPublicIP"
-  idle_timeout_in_minutes =  30
+  idle_timeout_in_minutes        = 30
 }
 
 resource "azurerm_network_interface_nat_rule_association" "sap-backend-pool" {
-  count = length(var.natports)
+  count                 = length(var.natports)
   network_interface_id  = azurerm_network_interface.sapapp-nic.id
-  ip_configuration_name =  join("-", [var.appvmname, "ipconfig01"])
+  ip_configuration_name = join("-", [var.appvmname, "ipconfig01"])
   nat_rule_id           = azurerm_lb_nat_rule.sap-access-nat[count.index].id
 }
 
