@@ -68,7 +68,7 @@ resource "azurerm_network_security_group" "sap-db-nsg" {
     access                     = "Allow"
     protocol                   = "Tcp"
     source_port_range          = "*"
-    destination_port_ranges    = ["30015", "30013", "50013"]
+    destination_port_ranges    = var.sapdb-ports
     source_address_prefix      = var.sapappsubnet
     destination_address_prefix = "*"
   }
@@ -110,7 +110,7 @@ resource "azurerm_network_security_group" "sap-app-nsg" {
     access                     = "Allow"
     protocol                   = "Tcp"
     source_port_range          = "*"
-    destination_port_ranges    = ["3200", "3300", "3600", "3900", "8000", "8001"]
+    destination_port_ranges    = var.sapapp-ports
     source_address_prefix      = var.hubsubnet
     destination_address_prefix = "*"
   }
@@ -185,7 +185,7 @@ resource "azurerm_network_security_group" "bastion-nsg" {
   }
 
   security_rule {
-    name                       = "BastionInboundDeny"
+    name                       = "InboundDeny"
     priority                   = 900
     direction                  = "Inbound"
     access                     = "Deny"
@@ -253,7 +253,7 @@ resource "azurerm_network_security_group" "hub-nsg" {
   }
 
   security_rule {
-    name                       = "BastionInboundDeny"
+    name                       = "InboundDeny"
     priority                   = 900
     direction                  = "Inbound"
     access                     = "Deny"
@@ -542,19 +542,19 @@ resource "azurerm_lb" "sap-access-lb" {
 }
 
 resource "azurerm_lb_nat_rule" "sap-access-nat" {
-  count                          = length(var.natports)
+  count                          = length(var.sapapp-ports)
   resource_group_name            = azurerm_resource_group.sap-rg.name
   loadbalancer_id                = azurerm_lb.sap-access-lb.id
-  name                           = join("-", ["Natrule-", var.natports[count.index]])
+  name                           = join("-", ["Natrule-", var.sapapp-ports[count.index]])
   protocol                       = "Tcp"
-  frontend_port                  = var.natports[count.index]
-  backend_port                   = var.natports[count.index]
+  frontend_port                  = var.sapapp-ports[count.index]
+  backend_port                   = var.sapapp-ports[count.index]
   frontend_ip_configuration_name = "SAPAccessPublicIP"
   idle_timeout_in_minutes        = 30
 }
 
 resource "azurerm_network_interface_nat_rule_association" "sap-backend-pool" {
-  count                 = length(var.natports)
+  count                 = length(var.sapapp-ports)
   network_interface_id  = azurerm_network_interface.sapapp-nic.id
   ip_configuration_name = join("-", [var.appvmname, "ipconfig01"])
   nat_rule_id           = azurerm_lb_nat_rule.sap-access-nat[count.index].id

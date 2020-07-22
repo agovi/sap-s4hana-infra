@@ -85,11 +85,6 @@ variable "dbdiskwaflag" {
   description = "Disk sizes for DB VM"
 }
 
-variable "natports" {
-  type        = list
-  description = "Load balancer NAT Ports"
-}
-
 variable "asset-insight-id" {
   description = "Asset id used for tagging"
 }
@@ -100,4 +95,12 @@ variable "creator-email" {
 
 variable "creator-id" {
   description = "Create userid used for tagging"
+}
+
+variable "sapapp-ports"{
+  description = "SAP Application ports to be opened"
+}
+
+variable "sapdb-ports" {
+  description = "SAP Database ports to be opened"
 }
