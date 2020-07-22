@@ -3,10 +3,19 @@ provider "azurerm" {
   features {}
 }
 
+locals {
+  generaltags = {
+    asset-insight-id = var.asset-insight-id
+    create-date      = formatdate("DD-MMM-YYYY", timestamp())
+    creator-email    = var.creator-email
+    creator-id       = var.creator-id
+  }
+}
 
 resource "azurerm_resource_group" "sap-rg" {
   name     = var.rgname
   location = var.location
+  tags     = local.generaltags
 }
 
 resource "azurerm_virtual_network" "sap-vnet" {
@@ -14,7 +23,7 @@ resource "azurerm_virtual_network" "sap-vnet" {
   resource_group_name = azurerm_resource_group.sap-rg.name
   location            = var.location
   address_space       = [for num in var.vnetprefix : num]
-
+  tags                = local.generaltags
 }
 
 resource "azurerm_subnet" "sap-app-subnet" {
@@ -22,6 +31,7 @@ resource "azurerm_subnet" "sap-app-subnet" {
   resource_group_name  = azurerm_resource_group.sap-rg.name
   virtual_network_name = azurerm_virtual_network.sap-vnet.name
   address_prefixes     = [var.sapappsubnet]
+
 }
 
 resource "azurerm_subnet" "sap-db-subnet" {
@@ -29,6 +39,7 @@ resource "azurerm_subnet" "sap-db-subnet" {
   resource_group_name  = azurerm_resource_group.sap-rg.name
   virtual_network_name = azurerm_virtual_network.sap-vnet.name
   address_prefixes     = [var.sapdbsubnet]
+
 }
 
 resource "azurerm_subnet" "sap-hub-subnet" {
@@ -83,6 +94,7 @@ resource "azurerm_network_security_group" "sap-db-nsg" {
     source_address_prefix      = "*"
     destination_address_prefix = "*"
   }
+  tags = local.generaltags
 }
 
 
@@ -138,6 +150,7 @@ resource "azurerm_network_security_group" "sap-app-nsg" {
     source_address_prefix      = "*"
     destination_address_prefix = "*"
   }
+  tags = local.generaltags
 
 }
 
@@ -206,6 +219,7 @@ resource "azurerm_network_security_group" "bastion-nsg" {
     source_address_prefix      = "*"
     destination_address_prefix = "AzureCloud"
   }
+  tags = local.generaltags
 }
 
 
@@ -249,6 +263,7 @@ resource "azurerm_network_security_group" "hub-nsg" {
     source_address_prefix      = "*"
     destination_address_prefix = "*"
   }
+  tags = local.generaltags
 }
 
 resource "azurerm_subnet_network_security_group_association" "sap-app-nsg-assc" {
@@ -276,6 +291,7 @@ resource "azurerm_proximity_placement_group" "sap-ppg" {
   name                = "S4HANA-PPG"
   location            = var.location
   resource_group_name = azurerm_resource_group.sap-rg.name
+  tags                = local.generaltags
 }
 
 
@@ -290,6 +306,7 @@ resource "azurerm_network_interface" "sapdb-nic" {
     private_ip_address_allocation = "Dynamic"
   }
   enable_accelerated_networking = "true"
+  tags                          = local.generaltags
 }
 
 resource "azurerm_linux_virtual_machine" "sapdb-vm" {
@@ -316,6 +333,7 @@ resource "azurerm_linux_virtual_machine" "sapdb-vm" {
     sku       = "12-SP4"
     version   = "latest"
   }
+  tags = local.generaltags
 
 }
 
@@ -327,7 +345,7 @@ resource "azurerm_managed_disk" "db-disks" {
   storage_account_type = "Premium_LRS"
   create_option        = "Empty"
   disk_size_gb         = var.dbdisksizes[count.index]
-
+  tags                 = local.generaltags
 }
 
 resource "azurerm_virtual_machine_data_disk_attachment" "db-disk-attach" {
@@ -337,7 +355,6 @@ resource "azurerm_virtual_machine_data_disk_attachment" "db-disk-attach" {
   lun                       = var.dbdiskluns[count.index]
   caching                   = var.dbdiskcache[count.index]
   write_accelerator_enabled = var.dbdiskwaflag[count.index]
-
 }
 
 resource "azurerm_virtual_machine_extension" "db-fscreate" {
@@ -359,6 +376,7 @@ resource "azurerm_public_ip" "sap-router-pip" {
   resource_group_name = azurerm_resource_group.sap-rg.name
   location            = var.location
   allocation_method   = "Dynamic"
+  tags                = local.generaltags
 }
 
 
@@ -374,6 +392,7 @@ resource "azurerm_network_interface" "sapapp-nic" {
     private_ip_address_allocation = "Dynamic"
   }
   enable_accelerated_networking = "true"
+  tags                          = local.generaltags
 }
 
 resource "azurerm_linux_virtual_machine" "sapapp-vm" {
@@ -401,7 +420,7 @@ resource "azurerm_linux_virtual_machine" "sapapp-vm" {
     sku       = "12-SP4"
     version   = "latest"
   }
-
+  tags = local.generaltags
 }
 
 resource "azurerm_managed_disk" "app-disks" {
@@ -411,7 +430,7 @@ resource "azurerm_managed_disk" "app-disks" {
   storage_account_type = "Premium_LRS"
   create_option        = "Empty"
   disk_size_gb         = 128
-
+  tags                 = local.generaltags
 }
 
 resource "azurerm_virtual_machine_data_disk_attachment" "app-disk-attach" {
@@ -434,6 +453,7 @@ resource "azurerm_network_interface" "saprouter-nic" {
     public_ip_address_id          = azurerm_public_ip.sap-router-pip.id
   }
   enable_accelerated_networking = "false"
+  tags                          = local.generaltags
 }
 
 
@@ -458,6 +478,7 @@ resource "azurerm_windows_virtual_machine" "saprouter-vm" {
     sku       = "2016-Datacenter"
     version   = "latest"
   }
+  tags = local.generaltags
 }
 
 resource "azurerm_managed_disk" "router-disks" {
@@ -467,7 +488,7 @@ resource "azurerm_managed_disk" "router-disks" {
   storage_account_type = "Premium_LRS"
   create_option        = "Empty"
   disk_size_gb         = 64
-
+  tags                 = local.generaltags
 }
 
 resource "azurerm_virtual_machine_data_disk_attachment" "router-disk-attach" {
@@ -484,6 +505,7 @@ resource "azurerm_public_ip" "bastion-pip" {
   resource_group_name = azurerm_resource_group.sap-rg.name
   sku                 = "Standard"
   allocation_method   = "Static"
+  tags                = local.generaltags
 }
 
 resource "azurerm_bastion_host" "sap-bastion" {
@@ -496,6 +518,7 @@ resource "azurerm_bastion_host" "sap-bastion" {
     subnet_id            = azurerm_subnet.bastion-subnet.id
     public_ip_address_id = azurerm_public_ip.bastion-pip.id
   }
+  tags = local.generaltags
 }
 
 resource "azurerm_public_ip" "sap-loadbalancer-pip" {
@@ -503,6 +526,7 @@ resource "azurerm_public_ip" "sap-loadbalancer-pip" {
   resource_group_name = azurerm_resource_group.sap-rg.name
   location            = var.location
   allocation_method   = "Dynamic"
+  tags                = local.generaltags
 }
 
 
@@ -514,6 +538,7 @@ resource "azurerm_lb" "sap-access-lb" {
     name                 = "SAPAccessPublicIP"
     public_ip_address_id = azurerm_public_ip.sap-loadbalancer-pip.id
   }
+  tags = local.generaltags
 }
 
 resource "azurerm_lb_nat_rule" "sap-access-nat" {

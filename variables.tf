@@ -17,11 +17,6 @@ variable "sshkeypath" {
   description = "Path for the SSH keys to be used for passwordless login to Linux VMs (eg ~/.ssh/id_rsa.pub)"
   //default     = "~/.ssh/id_rsa.pub"
 }
-variable "tags" {
-  description = "A map of tags to the deployed resources. Empty by default."
-  type        = map(string)
-  default     = {}
-}
 
 variable "vnetprefix" {
   type        = list
@@ -95,3 +90,14 @@ variable "natports" {
   description = "Load balancer NAT Ports"
 }
 
+variable "asset-insight-id" {
+  description = "Asset id used for tagging"
+}
+
+variable "creator-email" {
+  description = "Creator email used for tagging"
+}
+
+variable "creator-id" {
+  description = "Create userid used for tagging"
+}
