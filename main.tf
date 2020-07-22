@@ -328,9 +328,9 @@ resource "azurerm_linux_virtual_machine" "sapdb-vm" {
   }
 
   source_image_reference {
-    publisher = "SUSE"
-    offer     = "SLES-SAP"
-    sku       = "12-SP4"
+    publisher = "suse"
+    offer     = "sles-sap-12-sp5"
+    sku       = "gen1"
     version   = "latest"
   }
   tags = local.generaltags
@@ -415,9 +415,9 @@ resource "azurerm_linux_virtual_machine" "sapapp-vm" {
   }
 
   source_image_reference {
-    publisher = "SUSE"
-    offer     = "SLES-SAP"
-    sku       = "12-SP4"
+    publisher = "suse"
+    offer     = "sles-12-sp5"
+    sku       = "gen1"
     version   = "latest"
   }
   tags = local.generaltags
